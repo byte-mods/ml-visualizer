@@ -41,6 +41,13 @@ st.markdown("""
         margin: 1rem 0;
         border-left: 4px solid #1f77b4;
     }
+    .info-box p, .info-box li {
+        color: #1f1f1f;
+        margin-bottom: 0;
+    }
+    .stApp {
+        color: #31333f;
+    }
     .equation {
         font-family: "Times New Roman", serif;
         font-size: 1.2rem;
