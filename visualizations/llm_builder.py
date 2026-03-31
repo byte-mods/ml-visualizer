@@ -162,6 +162,14 @@ def create_llm_architecture(
     else:
         max_x = ffn_x_start + 1.4
 
+    # Architecture-specific settings
+    is_bert = "BERT" in architecture
+    is_gpt = "GPT" in architecture
+    is_llama = "LLaMA" in architecture
+    norm_label = "RMSNorm" if is_llama else "LayerNorm"
+    norm_color = colors['norm'] if is_llama else '#93c5fd'
+    norm_border = '#0f766e' if is_llama else '#1e40af'
+
     # Component positions for a single layer
     def draw_layer(layer_idx: int, y_pos: float):
 
@@ -174,17 +182,26 @@ def create_llm_architecture(
             textangle=-90
         )
 
-        # Pre-norm
-        fig.add_shape(
-            type="rect", x0=-0.8, x1=-0.2, y0=y_pos-0.3, y1=y_pos+0.3,
-            fillcolor=colors['norm'], line=dict(color='#0f766e', width=1),
-            opacity=0.8
-        )
-        fig.add_annotation(x=-0.5, y=y_pos, text="Norm", showarrow=False, font=dict(size=8))
+        # Pre-norm (LLaMA uses pre-norm RMSNorm, GPT uses post-norm LayerNorm, BERT uses post-norm)
+        if is_llama or is_gpt:
+            fig.add_shape(
+                type="rect", x0=-0.8, x1=-0.2, y0=y_pos-0.3, y1=y_pos+0.3,
+                fillcolor=norm_color, line=dict(color=norm_border, width=1),
+                opacity=0.8
+            )
+            fig.add_annotation(x=-0.5, y=y_pos, text=norm_label, showarrow=False, font=dict(size=7))
 
-        # Attention
+        # Attention block
         attn_x = 0.0
         attn_w = 1.6 if use_gqa else 2.0
+
+        # Attention type label varies by architecture
+        if is_bert:
+            attn_type_label = "Bi-Directional"
+        elif is_gpt:
+            attn_type_label = "Causal Masked"
+        else:
+            attn_type_label = "Causal"
 
         if use_gqa:
             # GQA: Show Q heads and shared KV
@@ -201,16 +218,19 @@ def create_llm_architecture(
                 opacity=0.8
             )
             fig.add_annotation(x=attn_x+attn_w/2, y=y_pos-0.02, text=f"KV Heads ({n_kv_heads})", showarrow=False, font=dict(size=7))
+
+            # Attention type indicator
+            fig.add_annotation(x=attn_x+attn_w/2, y=y_pos-0.4, text=attn_type_label, showarrow=False, font=dict(size=6, color='#64748b'))
         else:
             fig.add_shape(
                 type="rect", x0=attn_x, x1=attn_x+attn_w, y0=y_pos-0.3, y1=y_pos+0.3,
                 fillcolor=colors['attention'], line=dict(color='#be185d', width=1),
                 opacity=0.8
             )
-            fig.add_annotation(x=attn_x+attn_w/2, y=y_pos, text=f"Attention<br>({n_heads} heads)", showarrow=False, font=dict(size=8))
+            fig.add_annotation(x=attn_x+attn_w/2, y=y_pos+0.05, text=f"{attn_type_label}<br>Attention ({n_heads}h)", showarrow=False, font=dict(size=7))
 
-        # RoPE indicator
-        if use_rope:
+        # RoPE indicator (not used in BERT or classic GPT)
+        if use_rope and not is_bert:
             fig.add_annotation(
                 x=attn_x+attn_w+0.15, y=y_pos,
                 text="RoPE", showarrow=False,
@@ -219,14 +239,15 @@ def create_llm_architecture(
                 borderpad=3
             )
 
-        # Post-norm
+        # Post-norm (BERT/GPT use post-norm)
         norm2_x = attn_x + attn_w + 0.4
         fig.add_shape(
             type="rect", x0=norm2_x, x1=norm2_x+0.6, y0=y_pos-0.3, y1=y_pos+0.3,
-            fillcolor=colors['norm'], line=dict(color='#0f766e', width=1),
+            fillcolor=norm_color, line=dict(color=norm_border, width=1),
             opacity=0.8
         )
-        fig.add_annotation(x=norm2_x+0.3, y=y_pos, text="Norm", showarrow=False, font=dict(size=8))
+        norm2_label = norm_label if is_llama else ("Post-LN" if (is_bert or is_gpt) else "Norm")
+        fig.add_annotation(x=norm2_x+0.3, y=y_pos, text=norm2_label, showarrow=False, font=dict(size=7))
 
         # FFN / MoE
         ffn_x = norm2_x + 0.8
@@ -262,12 +283,14 @@ def create_llm_architecture(
             )
             fig.add_annotation(x=ffn_x+0.6, y=y_pos, text="SwiGLU<br>FFN", showarrow=False, font=dict(size=8))
         else:
+            ffn_label = "GELU FFN" if is_bert else ("GELU FFN" if is_gpt else "ReLU FFN")
+            ffn_color = '#c4b5fd' if is_bert else colors['ffn']
             fig.add_shape(
                 type="rect", x0=ffn_x, x1=ffn_x+1.2, y0=y_pos-0.3, y1=y_pos+0.3,
-                fillcolor=colors['ffn'], line=dict(color='#6b21a8', width=1),
+                fillcolor=ffn_color, line=dict(color='#6b21a8', width=1),
                 opacity=0.8
             )
-            fig.add_annotation(x=ffn_x+0.6, y=y_pos, text="FFN", showarrow=False, font=dict(size=8))
+            fig.add_annotation(x=ffn_x+0.6, y=y_pos, text=ffn_label, showarrow=False, font=dict(size=8))
 
         # Residual connection (curved arrow bypassing the layer)
         fig.add_trace(go.Scatter(
@@ -301,13 +324,17 @@ def create_llm_architecture(
         else:
             y = draw_layer(layer_num, y)
 
-    # Input/Output embeddings
+    # Input/Output embeddings - vary by architecture
+    embed_text = f"Token + {'RoPE' if use_rope and is_llama else 'Pos'} Embed ({d_model}d)"
+    if is_bert:
+        embed_text = f"Token + Position + Segment ({d_model}d)"
+
     fig.add_shape(
         type="rect", x0=-1.0, x1=1.0, y0=start_y+1.2, y1=start_y+1.8,
         fillcolor=colors['embedding'], line=dict(color='#1d4ed8', width=2),
         opacity=0.9
     )
-    fig.add_annotation(x=0, y=start_y+1.5, text=f"Token Embed + Pos ({d_model}d)", showarrow=False, font=dict(size=9))
+    fig.add_annotation(x=0, y=start_y+1.5, text=embed_text, showarrow=False, font=dict(size=9))
 
     # Arrow from embedding to first layer
     fig.add_annotation(
@@ -318,12 +345,26 @@ def create_llm_architecture(
         arrowhead=2, arrowcolor='#64748b', arrowsize=1.5
     )
 
+    # Output head varies by architecture
+    if is_bert:
+        output_text = "MLM / Classification Head"
+        output_color = '#86efac'
+        output_border = '#166534'
+    elif is_gpt:
+        output_text = "Autoregressive LM Head"
+        output_color = colors['output']
+        output_border = '#be123c'
+    else:
+        output_text = "Output LM Head"
+        output_color = colors['output']
+        output_border = '#be123c'
+
     fig.add_shape(
         type="rect", x0=-1.0, x1=1.0, y0=y-0.6, y1=y+0.0,
-        fillcolor=colors['output'], line=dict(color='#be123c', width=2),
+        fillcolor=output_color, line=dict(color=output_border, width=2),
         opacity=0.9
     )
-    fig.add_annotation(x=0, y=y-0.3, text=f"Output LM Head", showarrow=False, font=dict(size=9))
+    fig.add_annotation(x=0, y=y-0.3, text=output_text, showarrow=False, font=dict(size=9))
 
     # Title with stats
     param_text = f"<b>{stats['params_formatted']}</b> parameters | "
@@ -360,35 +401,52 @@ def create_attention_pattern(
     use_gqa: bool = False,
     use_sliding_window: bool = False,
     window_size: int = 16,
+    architecture: str = "LLaMA-style (Dense)",
     title: str = "Attention Pattern"
 ) -> go.Figure:
-    """Visualize attention patterns (full, GQA, sliding window)."""
+    """Visualize attention patterns (full, GQA, sliding window, causal/bidirectional)."""
+
+    is_causal = "BERT" not in architecture  # BERT is bidirectional, others are causal
+    sz = min(seq_len, 16)
+
+    def make_attn_matrix(sz, is_causal, use_sliding_window, window_size):
+        """Generate attention matrix based on architecture type."""
+        attn = np.zeros((sz, sz))
+        for i in range(sz):
+            for j in range(sz):
+                # Causal mask: can only attend to previous positions
+                if is_causal and j > i:
+                    attn[i, j] = 0
+                    continue
+                # Sliding window
+                if use_sliding_window and abs(i - j) > window_size:
+                    attn[i, j] = 0
+                    continue
+                # Attention weight (distance-based decay for realism)
+                dist = abs(i - j)
+                attn[i, j] = np.exp(-dist * 0.15)
+            # Normalize row
+            row_sum = attn[i].sum()
+            if row_sum > 0:
+                attn[i] /= row_sum
+        return attn
 
     if use_gqa:
         # GQA: Each query head group shares one KV head
         n_groups = min(n_heads, 4)  # Show max 4 groups
         cols = min(n_groups, 4)
-        rows = (n_groups + cols - 1) // cols  # Ceiling division
+        rows = (n_groups + cols - 1) // cols
 
         fig = make_subplots(
             rows=rows, cols=cols,
-            subplot_titles=[f"Q Head {i*4//n_heads} → KV Head {i * n_kv_heads // n_heads}" for i in range(n_groups)]
+            subplot_titles=[f"Q Head {i*n_heads//n_groups}-{(i+1)*n_heads//n_groups-1} → KV Head {i * n_kv_heads // n_groups}" for i in range(n_groups)]
         )
 
         for h in range(n_groups):
             row = h // cols + 1
             col = h % cols + 1
 
-            kv_idx = h * n_kv_heads // n_heads
-            attn = np.ones((min(16, seq_len), min(16, seq_len))) / min(seq_len, 16)
-
-            if use_sliding_window:
-                for i in range(min(16, seq_len)):
-                    for j in range(min(16, seq_len)):
-                        if abs(i - j) <= window_size:
-                            attn[i, j] = 1.0 / min(window_size * 2 + 1, seq_len)
-                        else:
-                            attn[i, j] = 0
+            attn = make_attn_matrix(sz, is_causal, use_sliding_window, window_size)
 
             heatmap = go.Heatmap(
                 z=attn,
@@ -400,21 +458,14 @@ def create_attention_pattern(
             fig.update_xaxes(title_text="Key", row=row, col=col)
             fig.update_yaxes(title_text="Query", row=row, col=col)
 
+        attn_desc = "Causal" if is_causal else "Bidirectional"
         fig.update_layout(
-            title=dict(text=f"<b>{title}</b><br><span style='font-size:11px'>GQA: {n_heads} Q heads → {n_kv_heads} KV heads</span>", x=0.5),
+            title=dict(text=f"<b>{title}</b><br><span style='font-size:11px'>{attn_desc} GQA: {n_heads} Q heads → {n_kv_heads} KV heads</span>", x=0.5),
             height=300, width=700
         )
 
     else:
-        # Full attention
-        if use_sliding_window:
-            attn = np.zeros((min(seq_len, 16), min(seq_len, 16)))
-            for i in range(min(seq_len, 16)):
-                for j in range(min(seq_len, 16)):
-                    if abs(i - j) <= window_size:
-                        attn[i, j] = 1.0 / min(abs(i - j) + 1, window_size)
-        else:
-            attn = np.ones((min(seq_len, 16), min(seq_len, 16))) / min(seq_len, 16)
+        attn = make_attn_matrix(sz, is_causal, use_sliding_window, window_size)
 
         fig = go.Figure()
         fig.add_trace(go.Heatmap(
@@ -422,11 +473,13 @@ def create_attention_pattern(
             colorscale='Blues',
             showscale=True,
             colorbar=dict(title="Attention", x=1.02),
-            zmin=0, zmax=attn.max() * 1.5
+            zmin=0, zmax=attn.max() * 1.2
         ))
 
+        attn_desc = "Causal" if is_causal else "Bidirectional"
+        window_desc = ", sliding window" if use_sliding_window else ""
         fig.update_layout(
-            title=dict(text=f"<b>{title}</b><br><span style='font-size:11px'>Full attention pattern{', sliding window' if use_sliding_window else ''}</span>", x=0.5),
+            title=dict(text=f"<b>{title}</b><br><span style='font-size:11px'>{attn_desc} attention{window_desc} | {n_heads} heads, seq_len={seq_len}</span>", x=0.5),
             xaxis=dict(title="Key position"),
             yaxis=dict(title="Query position"),
             height=400, width=500
@@ -449,8 +502,8 @@ def create_moe_visualization(
     # Token positions
     tokens = [f"Tok {i}" for i in range(seq_len)]
 
-    # Simulate expert routing
-    np.random.seed(42)
+    # Simulate expert routing (seed based on params so it changes with input)
+    np.random.seed(n_experts * 100 + top_k * 10 + seq_len + d_model)
     routing = np.random.randint(0, n_experts, size=(seq_len, top_k))
 
     # Expert load (for bar chart)
@@ -809,7 +862,7 @@ def show_llm_builder_ui():
                 show_kv_cache=show_kv_cache,
                 title=arch_names.get(architecture, "Modern LLM")
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, key=f"arch_{architecture}_{n_layers}_{n_heads}_{d_model}_{d_ff}_{use_moe}_{use_gqa}_{use_rope}_{use_swiglu}")
 
             # Stats summary
             st.markdown("### 📊 Model Statistics")
@@ -846,9 +899,10 @@ def show_llm_builder_ui():
                 use_gqa=use_gqa,
                 use_sliding_window=use_sliding_window,
                 window_size=window_size if use_sliding_window else 16,
+                architecture=architecture,
                 title="Attention Pattern"
             )
-            st.plotly_chart(fig_attn, use_container_width=True)
+            st.plotly_chart(fig_attn, use_container_width=True, key=f"attn_{n_heads}_{n_kv_heads}_{seq_len_vis}_{use_gqa}_{use_sliding_window}")
 
             st.markdown("""
             **Attention Types:**
@@ -866,7 +920,7 @@ def show_llm_builder_ui():
                     d_model=d_model,
                     title="Mixture of Experts Routing"
                 )
-                st.plotly_chart(fig_moe, use_container_width=True)
+                st.plotly_chart(fig_moe, use_container_width=True, key=f"moe_{n_experts}_{top_k}_{d_model}")
 
                 st.markdown(f"""
                 **MoE Analysis:**
@@ -897,7 +951,7 @@ def show_llm_builder_ui():
                     height=350, width=600,
                     plot_bgcolor='white'
                 )
-                st.plotly_chart(ffn_fig, use_container_width=True)
+                st.plotly_chart(ffn_fig, use_container_width=True, key=f"ffn_{n_layers}_{d_model}_{d_ff}_{use_swiglu}")
 
                 st.markdown(f"""
                 **SwiGLU (LLaMA, PaLM):**
@@ -921,7 +975,7 @@ def show_llm_builder_ui():
                         rope_theta=rope_theta if use_rope else 500000,
                         title="Rotary Position Embeddings"
                     )
-                    st.plotly_chart(fig_rope, use_container_width=True)
+                    st.plotly_chart(fig_rope, use_container_width=True, key=f"rope_{d_model}_{n_heads}_{context_length}_{rope_theta if use_rope else 0}")
                 else:
                     st.info("Enable RoPE to see visualization")
 
@@ -935,7 +989,7 @@ def show_llm_builder_ui():
                         max_context=context_length,
                         title="KV Cache Behavior"
                     )
-                    st.plotly_chart(fig_kv, use_container_width=True)
+                    st.plotly_chart(fig_kv, use_container_width=True, key=f"kv_{n_kv_heads}_{d_model}_{context_length}")
 
                 # Memory comparison
                 st.markdown("**Memory Comparison:**")
@@ -960,7 +1014,7 @@ def show_llm_builder_ui():
                     yaxis_title="Memory (MB)",
                     plot_bgcolor='white'
                 )
-                st.plotly_chart(fig_mem, use_container_width=True)
+                st.plotly_chart(fig_mem, use_container_width=True, key=f"mem_{n_heads}_{n_kv_heads}_{d_model}_{context_length}")
 
                 st.markdown(f"""
                 **GQA Savings:** {100*(1-gqa_kv/dense_kv):.1f}% less KV cache memory
