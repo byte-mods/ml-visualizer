@@ -816,7 +816,7 @@ def show_llm_builder_ui():
                 window_size=window_size if use_sliding_window else 16,
                 title="Attention Pattern"
             )
-            st.plotly_chart(fig_attn, use_container_width=True)
+            st.plotly_chart(fig_attn, width='stretch')
 
             st.markdown("""
             **Attention Types:**
@@ -834,7 +834,7 @@ def show_llm_builder_ui():
                     d_model=d_model,
                     title="Mixture of Experts Routing"
                 )
-                st.plotly_chart(fig_moe, use_container_width=True)
+                st.plotly_chart(fig_moe, width='stretch')
 
                 st.markdown(f"""
                 **MoE Analysis:**
@@ -865,7 +865,7 @@ def show_llm_builder_ui():
                     height=350, width=600,
                     plot_bgcolor='white'
                 )
-                st.plotly_chart(ffn_fig, use_container_width=True)
+                st.plotly_chart(ffn_fig, width='stretch')
 
                 st.markdown(f"""
                 **SwiGLU (LLaMA, PaLM):**
@@ -889,7 +889,7 @@ def show_llm_builder_ui():
                         rope_theta=rope_theta if use_rope else 500000,
                         title="Rotary Position Embeddings"
                     )
-                    st.plotly_chart(fig_rope, use_container_width=True)
+                    st.plotly_chart(fig_rope, width='stretch')
                 else:
                     st.info("Enable RoPE to see visualization")
 
@@ -903,7 +903,7 @@ def show_llm_builder_ui():
                         max_context=context_length,
                         title="KV Cache Behavior"
                     )
-                    st.plotly_chart(fig_kv, use_container_width=True)
+                    st.plotly_chart(fig_kv, width='stretch')
 
                 # Memory comparison
                 st.markdown("**Memory Comparison:**")
@@ -928,7 +928,7 @@ def show_llm_builder_ui():
                     yaxis_title="Memory (MB)",
                     plot_bgcolor='white'
                 )
-                st.plotly_chart(fig_mem, use_container_width=True)
+                st.plotly_chart(fig_mem, width='stretch')
 
                 st.markdown(f"""
                 **GQA Savings:** {100*(1-gqa_kv/dense_kv):.1f}% less KV cache memory

@@ -1066,4 +1066,4 @@ def show_activation_functions_ui():
             yaxis_range=[0, 1]
         )
 
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width='stretch')

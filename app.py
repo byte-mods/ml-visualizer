@@ -42,16 +42,43 @@ st.markdown("""
         border-left: 4px solid #1f77b4;
     }
     .info-box p, .info-box li {
-        color: #1f1f1f;
+        color: #1f1f1f !important;
         margin-bottom: 0;
     }
+    .info-box strong {
+        color: #1f1f1f;
+    }
     .stApp {
-        color: #31333f;
+        background-color: #ffffff !important;
+        color: #1f1f1f !important;
+    }
+    .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {
+        color: #1f1f1f !important;
+    }
+    .stApp p {
+        color: #1f1f1f !important;
+    }
+    body {
+        background-color: #ffffff;
+        color: #1f1f1f;
+    }
+    .stMarkdownContainer {
+        color: #1f1f1f;
+    }
+    .stSidebar {
+        background-color: #f0f2f6;
+    }
+    .stSidebar .stMarkdown, .stSidebar p, .stSidebar span, .stSidebar label {
+        color: #1f1f1f !important;
+    }
+    .stSidebar h1, .stSidebar h2, .stSidebar h3, .stSidebar h4 {
+        color: #1f1f1f !important;
     }
     .equation {
         font-family: "Times New Roman", serif;
         font-size: 1.2rem;
         background-color: #f8f9fa;
+        color: #1f1f1f;
         padding: 0.5rem;
         border-radius: 0.3rem;
         margin: 0.5rem 0;
@@ -816,7 +843,7 @@ def show_training_simulation():
                 yaxis_type="log"
             )
 
-            st.plotly_chart(fig_grad, use_container_width=True)
+            st.plotly_chart(fig_grad, width='stretch')
 
             if any(g < 0.001 for g in gradient_magnitudes):
                 st.warning("⚠️ Potential vanishing gradient detected in deeper layers!")
@@ -845,7 +872,7 @@ def show_training_simulation():
                 height=400
             )
 
-            st.plotly_chart(fig_sample, use_container_width=True)
+            st.plotly_chart(fig_sample, width='stretch')
 
             st.markdown("""
             **How to interpret training curves:**
@@ -932,9 +959,9 @@ st.markdown("---")
 col1, col2, col3 = st.columns(3)
 with col2:
     st.markdown(
-        "<div style='text-align: center; color: #666;'>"
+        "<div style='text-align: center; color: #1f1f1f;'>"
         "🧠 ML Visualization Lab • Educational Tool • "
-        "<a href='#' style='color: #666;'>GitHub</a>"
+        "<a href='#' style='color: #1f77b4;'>GitHub</a>"
         "</div>",
         unsafe_allow_html=True
     )

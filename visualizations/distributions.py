@@ -414,7 +414,7 @@ def show_distributions_ui():
                 sample_size=clt_sample_size,
                 n_samples=clt_n_samples
             )
-            st.plotly_chart(clt_fig, use_container_width=True)
+            st.plotly_chart(clt_fig, width='stretch')
 
     # Educational content
     st.markdown("---")
@@ -476,7 +476,7 @@ def show_distributions_ui():
         """)
 
     with st.expander("📊 Distribution-Specific Formulas"):
-        st.markdown(f"""
+        st.markdown("""
         **Normal (Gaussian) Distribution:** N(μ, σ²)
         ```
         PDF: f(x) = (1/√(2πσ²)) · exp(-(x-μ)²/2σ²)
@@ -733,4 +733,4 @@ def show_distributions_ui():
                 x_range=(x_min, x_max),
                 plot_type='pdf'
             )
-            st.plotly_chart(compare_fig, use_container_width=True)
+            st.plotly_chart(compare_fig, width='stretch')

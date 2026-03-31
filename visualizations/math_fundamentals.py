@@ -85,7 +85,7 @@ def create_gradient_descent_visualization(
         fig.add_trace(go.Scatter(
             x=path, y=[f(x) for x in path],
             mode='markers+lines',
-            marker=dict(size=10, color=range(len(path)), colorscale='Reds'),
+            marker=dict(size=10, color=list(range(len(path))), colorscale='Reds'),
             line=dict(color='red', width=2),
             name='Gradient Descent'
         ))
@@ -392,7 +392,7 @@ def create_optimizer_comparison_visualization(
 
     fig.add_trace(go.Scatter(x=path_x, y=path_y,
                              mode='markers+lines',
-                             marker=dict(size=4, color=range(len(path_x)), colorscale='Reds'),
+                             marker=dict(size=4, color=list(range(len(path_x))), colorscale='Reds'),
                              line=dict(color='red', width=2),
                              name=name))
 
