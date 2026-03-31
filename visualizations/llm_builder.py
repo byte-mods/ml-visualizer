@@ -140,14 +140,30 @@ def create_llm_architecture(
         use_moe, n_experts, top_k, use_swiglu, context_length
     )
 
+    # Limit displayed layers to avoid clutter
+    max_display_layers = 8
+    if n_layers <= max_display_layers:
+        display_layers = list(range(1, n_layers + 1))
+    else:
+        # Show first 3, last 3, and indicate skipped layers
+        display_layers = list(range(1, 4)) + [None] + list(range(n_layers - 2, n_layers + 1))
+
     # Layout parameters
     layer_height = 2.5
     layer_spacing = 3.0
-    start_y = (n_layers - 1) * layer_spacing / 2 + 4
+    n_display = len(display_layers)
+    start_y = (n_display - 1) * layer_spacing / 2 + 4
+
+    # Calculate max x extent for proper axis range
+    attn_width = 1.6 if use_gqa else 2.0
+    ffn_x_start = 1.2 + attn_width + 1.2
+    if use_moe:
+        max_x = ffn_x_start + 0.8 + min(n_experts, 4) * 0.35 + 0.5
+    else:
+        max_x = ffn_x_start + 1.4
 
     # Component positions for a single layer
     def draw_layer(layer_idx: int, y_pos: float):
-        components = []
 
         # Layer label
         fig.add_annotation(
@@ -158,53 +174,45 @@ def create_llm_architecture(
             textangle=-90
         )
 
-        # Input embedding
-        fig.add_shape(
-            type="rect", x0=-1, x1=0, y0=y_pos-0.4, y1=y_pos+0.4,
-            fillcolor=colors['input'], line=dict(color='#166534', width=2),
-            opacity=0.9
-        )
-        fig.add_annotation(x=-0.5, y=y_pos, text="Input", showarrow=False, font=dict(size=9))
-
         # Pre-norm
         fig.add_shape(
-            type="rect", x0=0.2, x1=0.8, y0=y_pos-0.3, y1=y_pos+0.3,
+            type="rect", x0=-0.8, x1=-0.2, y0=y_pos-0.3, y1=y_pos+0.3,
             fillcolor=colors['norm'], line=dict(color='#0f766e', width=1),
             opacity=0.8
         )
-        fig.add_annotation(x=0.5, y=y_pos, text="Norm", showarrow=False, font=dict(size=8))
+        fig.add_annotation(x=-0.5, y=y_pos, text="Norm", showarrow=False, font=dict(size=8))
 
         # Attention
-        attn_x = 1.2
-        attn_width = 1.6 if use_gqa else 2.0
+        attn_x = 0.0
+        attn_w = 1.6 if use_gqa else 2.0
 
         if use_gqa:
             # GQA: Show Q heads and shared KV
             fig.add_shape(
-                type="rect", x0=attn_x, x1=attn_x+attn_width, y0=y_pos+0.15, y1=y_pos+0.45,
+                type="rect", x0=attn_x, x1=attn_x+attn_w, y0=y_pos+0.15, y1=y_pos+0.45,
                 fillcolor=colors['q_head'], line=dict(color='#0369a1', width=1),
                 opacity=0.8
             )
-            fig.add_annotation(x=attn_x+attn_width/2, y=y_pos+0.3, text=f"Q Heads ({n_heads})", showarrow=False, font=dict(size=7))
+            fig.add_annotation(x=attn_x+attn_w/2, y=y_pos+0.3, text=f"Q Heads ({n_heads})", showarrow=False, font=dict(size=7))
 
             fig.add_shape(
-                type="rect", x0=attn_x, x1=attn_x+attn_width, y0=y_pos-0.15, y1=y_pos+0.1,
+                type="rect", x0=attn_x, x1=attn_x+attn_w, y0=y_pos-0.15, y1=y_pos+0.1,
                 fillcolor=colors['kv_head'], line=dict(color='#7c3aed', width=1),
                 opacity=0.8
             )
-            fig.add_annotation(x=attn_x+attn_width/2, y=y_pos-0.02, text=f"KV Heads ({n_kv_heads})", showarrow=False, font=dict(size=7))
+            fig.add_annotation(x=attn_x+attn_w/2, y=y_pos-0.02, text=f"KV Heads ({n_kv_heads})", showarrow=False, font=dict(size=7))
         else:
             fig.add_shape(
-                type="rect", x0=attn_x, x1=attn_x+attn_width, y0=y_pos-0.3, y1=y_pos+0.3,
+                type="rect", x0=attn_x, x1=attn_x+attn_w, y0=y_pos-0.3, y1=y_pos+0.3,
                 fillcolor=colors['attention'], line=dict(color='#be185d', width=1),
                 opacity=0.8
             )
-            fig.add_annotation(x=attn_x+attn_width/2, y=y_pos, text=f"Attention<br>({n_heads} heads)", showarrow=False, font=dict(size=8))
+            fig.add_annotation(x=attn_x+attn_w/2, y=y_pos, text=f"Attention<br>({n_heads} heads)", showarrow=False, font=dict(size=8))
 
         # RoPE indicator
         if use_rope:
             fig.add_annotation(
-                x=attn_x+attn_width+0.15, y=y_pos,
+                x=attn_x+attn_w+0.15, y=y_pos,
                 text="RoPE", showarrow=False,
                 font=dict(size=8, color=colors['rope']),
                 bordercolor=colors['rope'], borderwidth=1,
@@ -212,15 +220,16 @@ def create_llm_architecture(
             )
 
         # Post-norm
+        norm2_x = attn_x + attn_w + 0.4
         fig.add_shape(
-            type="rect", x0=attn_x+attn_width+0.4, x1=attn_x+attn_width+1.0, y0=y_pos-0.3, y1=y_pos+0.3,
+            type="rect", x0=norm2_x, x1=norm2_x+0.6, y0=y_pos-0.3, y1=y_pos+0.3,
             fillcolor=colors['norm'], line=dict(color='#0f766e', width=1),
             opacity=0.8
         )
-        fig.add_annotation(x=attn_x+attn_width+0.7, y=y_pos, text="Norm", showarrow=False, font=dict(size=8))
+        fig.add_annotation(x=norm2_x+0.3, y=y_pos, text="Norm", showarrow=False, font=dict(size=8))
 
         # FFN / MoE
-        ffn_x = attn_x + attn_width + 1.2
+        ffn_x = norm2_x + 0.8
         if use_moe:
             # MoE layer
             fig.add_shape(
@@ -243,7 +252,7 @@ def create_llm_architecture(
             if n_experts > 4:
                 fig.add_annotation(x=ffn_x+0.8+4*0.35+0.1, y=y_pos, text=f"+{n_experts-4}", showarrow=False, font=dict(size=7, color='#92400e'))
 
-            fig.add_annotation(x=ffn_x+1.5, y=y_pos, text=f"MoE<br>(top-{top_k})", showarrow=False, font=dict(size=8, color=colors['moe']))
+            fig.add_annotation(x=ffn_x+1.5, y=y_pos+0.55, text=f"MoE (top-{top_k})", showarrow=False, font=dict(size=8, color=colors['moe']))
 
         elif use_swiglu:
             fig.add_shape(
@@ -260,43 +269,61 @@ def create_llm_architecture(
             )
             fig.add_annotation(x=ffn_x+0.6, y=y_pos, text="FFN", showarrow=False, font=dict(size=8))
 
-        # Residual connections (arrows)
+        # Residual connection (curved arrow bypassing the layer)
+        fig.add_trace(go.Scatter(
+            x=[-1.0, -1.0, max_x + 0.2, max_x + 0.2],
+            y=[y_pos + 0.5, y_pos + 0.7, y_pos + 0.7, y_pos + 0.5],
+            mode='lines',
+            line=dict(color=colors['residual'], width=1.5, dash='dot'),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
         fig.add_annotation(
-            x=0, y=y_pos+0.6,
-            ax=-0.5, ay=y_pos+0.6,
-            text="", showarrow=True,
-            axref='x', ayref='y', xref='x', yref='y',
-            arrowhead=2, arrowcolor='#94a3b8', arrowsize=1
-        )
-        fig.add_annotation(
-            x=0.5, y=y_pos+0.6,
-            ax=0.5, ay=y_pos-0.6,
-            text="", showarrow=True,
-            axref='x', ayref='y', xref='x', yref='y',
-            arrowhead=2, arrowcolor='#94a3b8', arrowsize=1
+            x=max_x * 0.5, y=y_pos + 0.85,
+            text="residual", showarrow=False,
+            font=dict(size=7, color=colors['residual'])
         )
 
         return y_pos - layer_spacing
 
-    # Draw all layers
+    # Draw layers
     y = start_y
-    for i in range(n_layers):
-        y = draw_layer(i + 1, y)
+    for layer_num in display_layers:
+        if layer_num is None:
+            # Draw "..." indicator for skipped layers
+            fig.add_annotation(
+                x=max_x / 2, y=y,
+                text=f"... ({n_layers - 6} more layers) ...",
+                showarrow=False,
+                font=dict(size=14, color='#94a3b8')
+            )
+            y -= layer_spacing
+        else:
+            y = draw_layer(layer_num, y)
 
     # Input/Output embeddings
     fig.add_shape(
-        type="rect", x0=-1.5, x1=0.5, y0=start_y+1.2, y1=start_y+1.8,
+        type="rect", x0=-1.0, x1=1.0, y0=start_y+1.2, y1=start_y+1.8,
         fillcolor=colors['embedding'], line=dict(color='#1d4ed8', width=2),
         opacity=0.9
     )
-    fig.add_annotation(x=-0.5, y=start_y+1.5, text=f"Token Embed + Pos<br>({d_model}d)", showarrow=False, font=dict(size=9))
+    fig.add_annotation(x=0, y=start_y+1.5, text=f"Token Embed + Pos ({d_model}d)", showarrow=False, font=dict(size=9))
+
+    # Arrow from embedding to first layer
+    fig.add_annotation(
+        x=0, y=start_y + 0.5,
+        ax=0, ay=start_y + 1.2,
+        text="", showarrow=True,
+        axref='x', ayref='y', xref='x', yref='y',
+        arrowhead=2, arrowcolor='#64748b', arrowsize=1.5
+    )
 
     fig.add_shape(
-        type="rect", x0=-1.5, x1=0.5, y0=y-0.6, y1=y+0.0,
+        type="rect", x0=-1.0, x1=1.0, y0=y-0.6, y1=y+0.0,
         fillcolor=colors['output'], line=dict(color='#be123c', width=2),
         opacity=0.9
     )
-    fig.add_annotation(x=-0.5, y=y-0.3, text=f"Output<br>LM Head", showarrow=False, font=dict(size=9))
+    fig.add_annotation(x=0, y=y-0.3, text=f"Output LM Head", showarrow=False, font=dict(size=9))
 
     # Title with stats
     param_text = f"<b>{stats['params_formatted']}</b> parameters | "
@@ -316,9 +343,9 @@ def create_llm_architecture(
         showlegend=False,
         plot_bgcolor='#f8fafc',
         paper_bgcolor='white',
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-2, 4]),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-2, max_x + 1]),
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-        height=max(400, n_layers * 80 + 150),
+        height=max(400, n_display * 100 + 150),
         width=900,
         margin=dict(l=20, r=20, t=80, b=20)
     )
@@ -337,46 +364,46 @@ def create_attention_pattern(
 ) -> go.Figure:
     """Visualize attention patterns (full, GQA, sliding window)."""
 
-    fig = go.Figure()
-
     if use_gqa:
         # GQA: Each query head group shares one KV head
-        attention_matrix = np.zeros((n_heads, seq_len, seq_len))
-
-        for h in range(n_heads):
-            kv_idx = h * n_kv_heads // n_heads  # Which KV head this Q maps to
-            for i in range(seq_len):
-                for j in range(seq_len):
-                    if use_sliding_window:
-                        if abs(i - j) <= window_size:
-                            attention_matrix[h, i, j] = 1.0 / min(window_size * 2 + 1, seq_len)
-                    else:
-                        attention_matrix[h, i, j] = 1.0 / seq_len
-
-        # Create subplot for each head group
         n_groups = min(n_heads, 4)  # Show max 4 groups
-        rows = 1
         cols = min(n_groups, 4)
+        rows = (n_groups + cols - 1) // cols  # Ceiling division
 
         fig = make_subplots(
             rows=rows, cols=cols,
-            subplot_titles=[f"Q Head {i} → KV Head {i * n_kv_heads // n_heads}" for i in range(n_groups)]
+            subplot_titles=[f"Q Head {i*4//n_heads} → KV Head {i * n_kv_heads // n_heads}" for i in range(n_groups)]
         )
 
         for h in range(n_groups):
             row = h // cols + 1
             col = h % cols + 1
 
-            attn = attention_matrix[h % n_heads]
+            kv_idx = h * n_kv_heads // n_heads
+            attn = np.ones((min(16, seq_len), min(16, seq_len))) / min(seq_len, 16)
+
+            if use_sliding_window:
+                for i in range(min(16, seq_len)):
+                    for j in range(min(16, seq_len)):
+                        if abs(i - j) <= window_size:
+                            attn[i, j] = 1.0 / min(window_size * 2 + 1, seq_len)
+                        else:
+                            attn[i, j] = 0
+
             heatmap = go.Heatmap(
-                z=attn[:min(16, seq_len), :min(16, seq_len)],
+                z=attn,
                 colorscale='Blues',
-                showscale=False,
+                showscale=(h == n_groups - 1),
                 zmin=0, zmax=1
             )
             fig.add_trace(heatmap, row=row, col=col)
             fig.update_xaxes(title_text="Key", row=row, col=col)
             fig.update_yaxes(title_text="Query", row=row, col=col)
+
+        fig.update_layout(
+            title=dict(text=f"<b>{title}</b><br><span style='font-size:11px'>GQA: {n_heads} Q heads → {n_kv_heads} KV heads</span>", x=0.5),
+            height=300, width=700
+        )
 
     else:
         # Full attention
@@ -389,6 +416,7 @@ def create_attention_pattern(
         else:
             attn = np.ones((min(seq_len, 16), min(seq_len, 16))) / min(seq_len, 16)
 
+        fig = go.Figure()
         fig.add_trace(go.Heatmap(
             z=attn,
             colorscale='Blues',
@@ -671,75 +699,79 @@ def show_llm_builder_ui():
         architecture = st.selectbox(
             "Architecture Type",
             ["LLaMA-style (Dense)", "LLaMA-style (MoE)", "GPT-style", "BERT-style"],
-            help="Different architecture families"
+            key="llm_architecture_type"
         )
 
         st.markdown("### ⚙️ Core Parameters")
 
-        n_layers = st.slider("Layers", 1, 96, 32, 1)
-        n_heads = st.slider("Attention Heads", 1, 64, 32, 1)
-        d_model = st.slider("Model Dimension (d_model)", 128, 2048, 512, 64)
-        d_ff = st.slider("FFN Dimension", 256, 8192, 1360, 64)
+        n_layers = st.slider("Layers", 1, 96, 32, 1, key="llm_n_layers")
+        n_heads = st.slider("Attention Heads", 1, 64, 32, 1, key="llm_n_heads")
+        d_model = st.slider("Model Dimension (d_model)", 128, 2048, 512, 64, key="llm_d_model")
+        d_ff = st.slider("FFN Dimension", 256, 8192, 1360, 64, key="llm_d_ff")
 
         vocab_size = st.selectbox(
             "Vocabulary Size",
             [10000, 30000, 50000, 64000, 100000, 128256],
-            index=2
+            index=2,
+            key="llm_vocab_size"
         )
 
         context_length = st.selectbox(
             "Context Length",
             [512, 1024, 2048, 4096, 8192, 16384, 32768, 100000, 1000000],
             index=3,
-            format_func=lambda x: f"{x:,}" if x < 100000 else f"{x/1000:.0f}K"
+            format_func=lambda x: f"{x:,}" if x < 100000 else f"{x/1000:.0f}K",
+            key="llm_context_length"
         )
 
         st.markdown("### 🔧 Modern Features")
 
-        use_gqa = st.checkbox("Grouped Query Attention (GQA)", True)
+        use_gqa = st.checkbox("Grouped Query Attention (GQA)", True, key="llm_use_gqa")
         if use_gqa:
             n_kv_heads = st.slider("KV Heads", 1, n_heads, max(1, n_heads // 4), 1,
-                                  help="Fewer KV heads = more efficient")
+                                  help="Fewer KV heads = more efficient", key="llm_n_kv_heads")
         else:
             n_kv_heads = n_heads
 
         use_swiglu = st.checkbox("SwiGLU Activation", True,
-                                  help="Used in LLaMA, PaLM (better than ReLU)")
+                                  help="Used in LLaMA, PaLM (better than ReLU)", key="llm_use_swiglu")
 
         use_rope = st.checkbox("Rotary Position Embeddings (RoPE)", True,
-                                help="Most modern LLMs use RoPE")
+                                help="Most modern LLMs use RoPE", key="llm_use_rope")
 
         if use_rope:
             rope_theta = st.selectbox(
                 "RoPE θ",
                 [10000, 50000, 100000, 500000, 1000000],
                 index=3,
-                format_func=lambda x: f"{x:,}"
+                format_func=lambda x: f"{x:,}",
+                key="llm_rope_theta"
             )
 
         use_sliding_window = st.checkbox("Sliding Window Attention", False,
-                                         help="Efficient for long contexts (Mistral)")
+                                         help="Efficient for long contexts (Mistral)", key="llm_use_sliding_window")
 
         if use_sliding_window:
-            window_size = st.slider("Window Size", 32, 8192, 4096, 32)
+            window_size = st.slider("Window Size", 32, 8192, 4096, 32, key="llm_window_size")
 
         use_moe = st.checkbox("Mixture of Experts (MoE)", False,
-                               help="Only activate top-K experts per token")
+                               help="Only activate top-K experts per token", key="llm_use_moe")
 
         if use_moe:
-            n_experts = st.slider("Number of Experts", 2, 64, 8, 1)
-            top_k = st.slider("Top-K Routing", 1, n_experts, 2, 1)
+            n_experts = st.slider("Number of Experts", 2, 64, 8, 1, key="llm_n_experts")
+            top_k = st.slider("Top-K Routing", 1, n_experts, 2, 1, key="llm_top_k")
 
         show_kv_cache = st.checkbox("Show KV Cache", True,
-                                     help="Visualize cache behavior")
+                                     help="Visualize cache behavior", key="llm_show_kv_cache")
 
     with col1:
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab_names = [
             "🏗️ Architecture",
             "👁️ Attention Pattern",
             "⚡ MoE Routing" if use_moe else "📊 Expert Config",
             "🔄 RoPE & Cache"
-        ])
+        ]
+        tab1, tab2, tab3, tab4 = st.tabs(tab_names)
 
         with tab1:
             # Calculate stats
@@ -816,7 +848,7 @@ def show_llm_builder_ui():
                 window_size=window_size if use_sliding_window else 16,
                 title="Attention Pattern"
             )
-            st.plotly_chart(fig_attn, width='stretch')
+            st.plotly_chart(fig_attn, use_container_width=True)
 
             st.markdown("""
             **Attention Types:**
@@ -834,7 +866,7 @@ def show_llm_builder_ui():
                     d_model=d_model,
                     title="Mixture of Experts Routing"
                 )
-                st.plotly_chart(fig_moe, width='stretch')
+                st.plotly_chart(fig_moe, use_container_width=True)
 
                 st.markdown(f"""
                 **MoE Analysis:**
@@ -865,7 +897,7 @@ def show_llm_builder_ui():
                     height=350, width=600,
                     plot_bgcolor='white'
                 )
-                st.plotly_chart(ffn_fig, width='stretch')
+                st.plotly_chart(ffn_fig, use_container_width=True)
 
                 st.markdown(f"""
                 **SwiGLU (LLaMA, PaLM):**
@@ -889,7 +921,7 @@ def show_llm_builder_ui():
                         rope_theta=rope_theta if use_rope else 500000,
                         title="Rotary Position Embeddings"
                     )
-                    st.plotly_chart(fig_rope, width='stretch')
+                    st.plotly_chart(fig_rope, use_container_width=True)
                 else:
                     st.info("Enable RoPE to see visualization")
 
@@ -903,7 +935,7 @@ def show_llm_builder_ui():
                         max_context=context_length,
                         title="KV Cache Behavior"
                     )
-                    st.plotly_chart(fig_kv, width='stretch')
+                    st.plotly_chart(fig_kv, use_container_width=True)
 
                 # Memory comparison
                 st.markdown("**Memory Comparison:**")
@@ -928,7 +960,7 @@ def show_llm_builder_ui():
                     yaxis_title="Memory (MB)",
                     plot_bgcolor='white'
                 )
-                st.plotly_chart(fig_mem, width='stretch')
+                st.plotly_chart(fig_mem, use_container_width=True)
 
                 st.markdown(f"""
                 **GQA Savings:** {100*(1-gqa_kv/dense_kv):.1f}% less KV cache memory

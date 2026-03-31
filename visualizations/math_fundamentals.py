@@ -244,7 +244,7 @@ def create_activation_function_visualization(
     elif func_type == "elu":
         alpha = 1.0
         y = np.where(x > 0, x, alpha * (np.exp(x) - 1))
-        dy = np.where(x > 0, 1, y + alpha)
+        dy = np.where(x > 0, 1, alpha * np.exp(x))
         title = "ELU: x > 0 ? x : α(eˣ - 1)"
     elif func_type == "gelu":
         y = 0.5 * x * (1 + np.tanh(np.sqrt(2/np.pi) * (x + 0.044715 * x**3)))
@@ -384,10 +384,12 @@ def create_optimizer_comparison_visualization(
             m_y = beta1 * m_y + (1 - beta1) * gy
             v_x = beta2 * v_x + (1 - beta2) * gx**2
             v_y = beta2 * v_y + (1 - beta2) * gy**2
-            m_hat = m_x / (1 - beta1**t)
-            v_hat = v_x / (1 - beta2**t)
-            path_x.append(path_x[-1] - lr * m_hat / (np.sqrt(v_hat) + eps))
-            path_y.append(path_y[-1] - lr * m_y / (np.sqrt(v_y) + eps))
+            m_x_hat = m_x / (1 - beta1**t)
+            v_x_hat = v_x / (1 - beta2**t)
+            m_y_hat = m_y / (1 - beta1**t)
+            v_y_hat = v_y / (1 - beta2**t)
+            path_x.append(path_x[-1] - lr * m_x_hat / (np.sqrt(v_x_hat) + eps))
+            path_y.append(path_y[-1] - lr * m_y_hat / (np.sqrt(v_y_hat) + eps))
         name = "Adam (adaptive)"
 
     fig.add_trace(go.Scatter(x=path_x, y=path_y,

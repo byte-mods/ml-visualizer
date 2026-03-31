@@ -37,101 +37,269 @@ def create_transformer_architecture(
 
     # Colors for different components
     colors = {
-        'input': 'lightblue',
-        'output': 'lightcoral',
-        'encoder': 'lightgreen',
-        'decoder': 'lightyellow',
-        'attention': 'lightpink',
-        'ffn': 'lightgray',
-        'norm': 'lightseagreen',
-        'residual': 'lightsalmon'
+        'input': '#93c5fd',
+        'output': '#fca5a5',
+        'encoder': '#86efac',
+        'decoder': '#fde68a',
+        'attention': '#f9a8d4',
+        'ffn': '#d1d5db',
+        'norm': '#5eead4',
+        'residual': '#fdba74',
+        'cross_attn': '#c4b5fd'
     }
 
-    # Create a simplified diagram
-    # We'll create a flow diagram from left to right
+    # Limit displayed layers
+    max_show = 4
+    show_layers = min(n_layers, max_show)
 
-    # Component positions
-    components = [
-        ("Input Embedding", 0, 5, colors['input']),
-        ("Positional Encoding", 0, 4, colors['input']),
-    ]
+    # Vertical layout: top-to-bottom flow
+    # Each layer block has sub-components stacked vertically
+    layer_block_height = 2.0  # total height per layer block
+    sub_h = 0.35  # height of each sub-component rectangle
+    gap = 0.15  # gap between sub-components
+
+    # Encoder column at x=1, Decoder column at x=4
+    enc_x = 1.0
+    dec_x = 4.0
+    box_half_w = 0.8
+
+    # --- Draw Encoder ---
+    y_cursor = 0.0
+
+    # Input Embedding
+    fig.add_shape(type="rect", x0=enc_x-box_half_w, x1=enc_x+box_half_w,
+                  y0=y_cursor, y1=y_cursor+0.5, fillcolor=colors['input'],
+                  line=dict(color='#1e40af', width=1.5), opacity=0.9)
+    fig.add_annotation(x=enc_x, y=y_cursor+0.25, text=f"Input Embedding<br>(d={d_model})",
+                      showarrow=False, font=dict(size=9))
+
+    y_cursor -= 0.6
+
+    # Positional Encoding
+    fig.add_shape(type="rect", x0=enc_x-box_half_w, x1=enc_x+box_half_w,
+                  y0=y_cursor, y1=y_cursor+0.4, fillcolor=colors['input'],
+                  line=dict(color='#1e40af', width=1), opacity=0.7)
+    fig.add_annotation(x=enc_x, y=y_cursor+0.2, text="+ Positional Encoding",
+                      showarrow=False, font=dict(size=8))
+
+    y_cursor -= 0.5
 
     # Encoder layers
-    for i in range(n_layers):
-        y_pos = 3 - i * 0.5
-        components.append((f"Encoder {i+1}", 1, y_pos, colors['encoder']))
-        components.append((f"Multi-Head Attention", 2, y_pos + 0.1, colors['attention']))
-        components.append((f"Feed Forward", 2, y_pos - 0.1, colors['ffn']))
-        components.append((f"Layer Norm", 1.5, y_pos, colors['norm']))
-        components.append((f"Residual", 1.2, y_pos, colors['residual']))
+    enc_start_y = y_cursor
+    for i in range(show_layers):
+        block_top = y_cursor
 
-    # Decoder layers (if showing full transformer)
-    if show_decoder:
-        components.append(("Output Embedding", 0, -2, colors['input']))
-        components.append(("Output Positional Encoding", 0, -3, colors['input']))
+        # Layer border
+        fig.add_shape(type="rect", x0=enc_x-box_half_w-0.1, x1=enc_x+box_half_w+0.1,
+                      y0=block_top - layer_block_height, y1=block_top,
+                      fillcolor='rgba(134, 239, 172, 0.1)',
+                      line=dict(color='#16a34a', width=1, dash='dot'), opacity=0.8)
+        fig.add_annotation(x=enc_x-box_half_w-0.15, y=block_top - layer_block_height/2,
+                          text=f"Enc {i+1}", showarrow=False,
+                          font=dict(size=8, color='#16a34a'), textangle=-90)
 
-        for i in range(n_layers):
-            y_pos = -4 - i * 0.5
-            components.append((f"Decoder {i+1}", 1, y_pos, colors['decoder']))
-            components.append((f"Masked Attention", 2, y_pos + 0.2, colors['attention']))
-            components.append((f"Encoder-Decoder Attention", 2, y_pos, colors['attention']))
-            components.append((f"Feed Forward", 2, y_pos - 0.2, colors['ffn']))
-            components.append((f"Layer Norm", 1.5, y_pos, colors['norm']))
-        components.append(("Linear", 3, -4 - (n_layers-1)*0.5, colors['output']))
-        components.append(("Softmax", 4, -4 - (n_layers-1)*0.5, colors['output']))
+        # Sub-components inside the block
+        cy = block_top - gap
 
-    # Add components as rectangles
-    for name, x, y, color in components:
-        fig.add_shape(
-            type="rect",
-            x0=x - 0.4,
-            x1=x + 0.4,
-            y0=y - 0.2,
-            y1=y + 0.2,
-            fillcolor=color,
-            line=dict(color="black", width=1),
-            opacity=0.8
-        )
+        # Layer Norm
+        fig.add_shape(type="rect", x0=enc_x-0.6, x1=enc_x+0.6,
+                      y0=cy-sub_h, y1=cy, fillcolor=colors['norm'],
+                      line=dict(color='#0d9488', width=1), opacity=0.8)
+        fig.add_annotation(x=enc_x, y=cy-sub_h/2, text="Layer Norm", showarrow=False, font=dict(size=7))
+        cy -= sub_h + gap
 
-        # Add text
-        fig.add_annotation(
-            x=x,
-            y=y,
-            text=name,
-            showarrow=False,
-            font=dict(size=8 if len(name) > 15 else 10),
-            textangle=0
-        )
+        # Multi-Head Attention
+        fig.add_shape(type="rect", x0=enc_x-0.7, x1=enc_x+0.7,
+                      y0=cy-sub_h, y1=cy, fillcolor=colors['attention'],
+                      line=dict(color='#db2777', width=1), opacity=0.8)
+        fig.add_annotation(x=enc_x, y=cy-sub_h/2, text=f"Multi-Head Attention ({n_heads}h)",
+                          showarrow=False, font=dict(size=7))
+        cy -= sub_h + gap
 
-    # Add connections
-    # Input to encoder
+        # Layer Norm
+        fig.add_shape(type="rect", x0=enc_x-0.6, x1=enc_x+0.6,
+                      y0=cy-sub_h, y1=cy, fillcolor=colors['norm'],
+                      line=dict(color='#0d9488', width=1), opacity=0.8)
+        fig.add_annotation(x=enc_x, y=cy-sub_h/2, text="Layer Norm", showarrow=False, font=dict(size=7))
+        cy -= sub_h + gap
+
+        # Feed Forward
+        fig.add_shape(type="rect", x0=enc_x-0.7, x1=enc_x+0.7,
+                      y0=cy-sub_h, y1=cy, fillcolor=colors['ffn'],
+                      line=dict(color='#6b7280', width=1), opacity=0.8)
+        fig.add_annotation(x=enc_x, y=cy-sub_h/2, text=f"FFN ({d_ff})",
+                          showarrow=False, font=dict(size=7))
+
+        y_cursor -= layer_block_height + 0.3
+
+    # Skipped layers indicator
+    if n_layers > max_show:
+        fig.add_annotation(x=enc_x, y=y_cursor + 0.15,
+                          text=f"... ({n_layers - max_show} more encoder layers) ...",
+                          showarrow=False, font=dict(size=9, color='#6b7280'))
+        y_cursor -= 0.5
+
+    enc_bottom_y = y_cursor
+
+    # Connection: input to first encoder
     fig.add_trace(go.Scatter(
-        x=[0, 1], y=[4.5, 3.5],
-        mode='lines',
-        line=dict(color='black', width=1, dash='dash'),
-        showlegend=False
+        x=[enc_x, enc_x], y=[enc_start_y + 0.4, enc_start_y + 0.05],
+        mode='lines', line=dict(color='#374151', width=1.5),
+        showlegend=False, hoverinfo='skip'
     ))
 
-    # Encoder layers connections
-    for i in range(n_layers - 1):
-        y_from = 3 - i * 0.5
-        y_to = 3 - (i + 1) * 0.5
+    # Connections between encoder layers
+    for i in range(show_layers - 1):
+        y_from = enc_start_y - (i + 1) * (layer_block_height + 0.3) + 0.15
+        y_to = y_from - 0.15
         fig.add_trace(go.Scatter(
-            x=[1, 1], y=[y_from, y_to],
-            mode='lines',
-            line=dict(color='black', width=1),
-            showlegend=False
+            x=[enc_x, enc_x], y=[y_from, y_to],
+            mode='lines', line=dict(color='#374151', width=1.5),
+            showlegend=False, hoverinfo='skip'
         ))
+
+    # --- Draw Decoder (if enabled) ---
+    if show_decoder:
+        y_cursor_dec = 0.0
+
+        # Output Embedding
+        fig.add_shape(type="rect", x0=dec_x-box_half_w, x1=dec_x+box_half_w,
+                      y0=y_cursor_dec, y1=y_cursor_dec+0.5, fillcolor=colors['input'],
+                      line=dict(color='#1e40af', width=1.5), opacity=0.9)
+        fig.add_annotation(x=dec_x, y=y_cursor_dec+0.25, text="Output Embedding",
+                          showarrow=False, font=dict(size=9))
+
+        y_cursor_dec -= 0.6
+
+        # Positional Encoding
+        fig.add_shape(type="rect", x0=dec_x-box_half_w, x1=dec_x+box_half_w,
+                      y0=y_cursor_dec, y1=y_cursor_dec+0.4, fillcolor=colors['input'],
+                      line=dict(color='#1e40af', width=1), opacity=0.7)
+        fig.add_annotation(x=dec_x, y=y_cursor_dec+0.2, text="+ Positional Encoding",
+                          showarrow=False, font=dict(size=8))
+
+        y_cursor_dec -= 0.5
+        dec_start_y = y_cursor_dec
+
+        # Decoder layers
+        dec_block_height = 2.8  # taller because 3 sub-components
+        for i in range(show_layers):
+            block_top = y_cursor_dec
+
+            # Layer border
+            fig.add_shape(type="rect", x0=dec_x-box_half_w-0.1, x1=dec_x+box_half_w+0.1,
+                          y0=block_top - dec_block_height, y1=block_top,
+                          fillcolor='rgba(253, 230, 138, 0.1)',
+                          line=dict(color='#ca8a04', width=1, dash='dot'), opacity=0.8)
+            fig.add_annotation(x=dec_x-box_half_w-0.15, y=block_top - dec_block_height/2,
+                              text=f"Dec {i+1}", showarrow=False,
+                              font=dict(size=8, color='#ca8a04'), textangle=-90)
+
+            cy = block_top - gap
+
+            # Layer Norm
+            fig.add_shape(type="rect", x0=dec_x-0.6, x1=dec_x+0.6,
+                          y0=cy-sub_h, y1=cy, fillcolor=colors['norm'],
+                          line=dict(color='#0d9488', width=1), opacity=0.8)
+            fig.add_annotation(x=dec_x, y=cy-sub_h/2, text="Layer Norm", showarrow=False, font=dict(size=7))
+            cy -= sub_h + gap
+
+            # Masked Multi-Head Attention
+            fig.add_shape(type="rect", x0=dec_x-0.7, x1=dec_x+0.7,
+                          y0=cy-sub_h, y1=cy, fillcolor=colors['attention'],
+                          line=dict(color='#db2777', width=1), opacity=0.8)
+            fig.add_annotation(x=dec_x, y=cy-sub_h/2, text=f"Masked Attention ({n_heads}h)",
+                              showarrow=False, font=dict(size=7))
+            cy -= sub_h + gap
+
+            # Layer Norm
+            fig.add_shape(type="rect", x0=dec_x-0.6, x1=dec_x+0.6,
+                          y0=cy-sub_h, y1=cy, fillcolor=colors['norm'],
+                          line=dict(color='#0d9488', width=1), opacity=0.8)
+            fig.add_annotation(x=dec_x, y=cy-sub_h/2, text="Layer Norm", showarrow=False, font=dict(size=7))
+            cy -= sub_h + gap
+
+            # Encoder-Decoder Attention
+            fig.add_shape(type="rect", x0=dec_x-0.7, x1=dec_x+0.7,
+                          y0=cy-sub_h, y1=cy, fillcolor=colors['cross_attn'],
+                          line=dict(color='#7c3aed', width=1), opacity=0.8)
+            fig.add_annotation(x=dec_x, y=cy-sub_h/2, text="Cross-Attention",
+                              showarrow=False, font=dict(size=7))
+
+            # Arrow from encoder to cross-attention
+            cross_attn_y = cy - sub_h / 2
+            fig.add_trace(go.Scatter(
+                x=[enc_x + box_half_w + 0.1, dec_x - box_half_w - 0.1],
+                y=[cross_attn_y, cross_attn_y],
+                mode='lines', line=dict(color='#7c3aed', width=1.5, dash='dash'),
+                showlegend=False, hoverinfo='skip'
+            ))
+
+            cy -= sub_h + gap
+
+            # Layer Norm
+            fig.add_shape(type="rect", x0=dec_x-0.6, x1=dec_x+0.6,
+                          y0=cy-sub_h, y1=cy, fillcolor=colors['norm'],
+                          line=dict(color='#0d9488', width=1), opacity=0.8)
+            fig.add_annotation(x=dec_x, y=cy-sub_h/2, text="Layer Norm", showarrow=False, font=dict(size=7))
+            cy -= sub_h + gap
+
+            # Feed Forward
+            fig.add_shape(type="rect", x0=dec_x-0.7, x1=dec_x+0.7,
+                          y0=cy-sub_h, y1=cy, fillcolor=colors['ffn'],
+                          line=dict(color='#6b7280', width=1), opacity=0.8)
+            fig.add_annotation(x=dec_x, y=cy-sub_h/2, text=f"FFN ({d_ff})",
+                              showarrow=False, font=dict(size=7))
+
+            y_cursor_dec -= dec_block_height + 0.3
+
+        # Skipped layers indicator
+        if n_layers > max_show:
+            fig.add_annotation(x=dec_x, y=y_cursor_dec + 0.15,
+                              text=f"... ({n_layers - max_show} more decoder layers) ...",
+                              showarrow=False, font=dict(size=9, color='#6b7280'))
+            y_cursor_dec -= 0.5
+
+        # Linear + Softmax output
+        y_cursor_dec -= 0.2
+        fig.add_shape(type="rect", x0=dec_x-0.6, x1=dec_x+0.6,
+                      y0=y_cursor_dec-0.4, y1=y_cursor_dec, fillcolor=colors['output'],
+                      line=dict(color='#dc2626', width=1.5), opacity=0.9)
+        fig.add_annotation(x=dec_x, y=y_cursor_dec-0.2, text="Linear + Softmax",
+                          showarrow=False, font=dict(size=8))
+
+        # Connections between decoder layers
+        for i in range(show_layers - 1):
+            y_from = dec_start_y - (i + 1) * (dec_block_height + 0.3) + 0.15
+            y_to = y_from - 0.15
+            fig.add_trace(go.Scatter(
+                x=[dec_x, dec_x], y=[y_from, y_to],
+                mode='lines', line=dict(color='#374151', width=1.5),
+                showlegend=False, hoverinfo='skip'
+            ))
+
+        min_y = min(enc_bottom_y, y_cursor_dec - 0.5)
+    else:
+        min_y = enc_bottom_y
+
+    # Column labels
+    fig.add_annotation(x=enc_x, y=1.0, text="<b>ENCODER</b>",
+                      showarrow=False, font=dict(size=13, color='#16a34a'))
+    if show_decoder:
+        fig.add_annotation(x=dec_x, y=1.0, text="<b>DECODER</b>",
+                          showarrow=False, font=dict(size=13, color='#ca8a04'))
 
     # Update layout
     fig.update_layout(
         title=title,
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1, 5]),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-10, 6]),
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                   range=[-0.5, 6] if show_decoder else [-0.5, 3]),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False,
+                   range=[min_y - 0.5, 1.5]),
         showlegend=False,
         plot_bgcolor='white',
         width=800,
-        height=600
+        height=max(600, abs(min_y) * 80 + 200)
     )
 
     return fig
@@ -269,6 +437,7 @@ def create_diffusion_process(
 def create_video_model_architecture(
     temporal_layers: int = 3,
     spatial_layers: int = 4,
+    n_frames: int = 5,
     title: str = "Video Model Architecture"
 ) -> go.Figure:
     """
@@ -288,7 +457,6 @@ def create_video_model_architecture(
     # Frames × Height × Width × Channels
 
     # Generate sample video data positions
-    n_frames = 5
     height = 4
     width = 4
 
@@ -362,16 +530,18 @@ def create_video_model_architecture(
             name=f'Spatial Layer {layer}'
         ))
 
-        # Add connections from previous layer (simplified)
+        # Add connections from previous layer
         if layer > 1:
-            # Add some representative connections
-            for f in [0, n_frames//2, n_frames-1]:
+            prev_compressed_w = max(1, width // (2 ** (layer - 1)))
+            for f in [0, n_frames // 2, n_frames - 1]:
+                cx_prev = f * (prev_compressed_w + 2)
+                cx_curr = f * (compressed_width + 2)
                 fig.add_trace(go.Scatter3d(
-                    x=[0, 0], y=[0, 0], z=[(layer-1)*2, layer*2],
+                    x=[cx_prev, cx_curr], y=[0, 0], z=[(layer-1)*2, layer*2],
                     mode='lines',
-                    line=dict(color='gray', width=1),
+                    line=dict(color='gray', width=2),
                     showlegend=False,
-                    opacity=0.3
+                    opacity=0.4
                 ))
 
     # Temporal processing layers (on top)
@@ -631,6 +801,7 @@ def show_advanced_models_ui():
             fig = create_video_model_architecture(
                 temporal_layers=temporal_layers,
                 spatial_layers=spatial_layers,
+                n_frames=n_frames,
                 title=f"Video Model Architecture"
             )
             st.plotly_chart(fig, use_container_width=True)

@@ -198,16 +198,31 @@ def create_matrix_visualization(
     z_flat = np.zeros_like(x_flat)
     dz_flat = matrix.flatten()
 
-    fig = go.Figure(data=[go.Bar3d(
-        x=x_flat,
-        y=y_flat,
-        z=z_flat,
-        dx=0.8 * np.ones_like(x_flat),
-        dy=0.8 * np.ones_like(y_flat),
-        dz=dz_flat,
-        colorscale=colorscale,
-        colorbar=dict(title="Value")
-    )])
+    # Build 3D bars using individual Surface traces for each matrix cell
+    fig = go.Figure()
+    norm_vals = (dz_flat - dz_flat.min()) / (dz_flat.max() - dz_flat.min() + 1e-10)
+    import plotly.colors as pc
+    cscale = pc.sample_colorscale(colorscale, norm_vals.tolist())
+
+    for idx in range(len(x_flat)):
+        xi, yi, dz = x_flat[idx], y_flat[idx], dz_flat[idx]
+        if abs(dz) < 1e-10:
+            continue
+        # Top face of the bar
+        bx = [xi, xi + 0.8, xi + 0.8, xi]
+        by = [yi, yi, yi + 0.8, yi + 0.8]
+        bz = [dz, dz, dz, dz]
+        fig.add_trace(go.Mesh3d(
+            x=bx + bx + [xi, xi + 0.8, xi + 0.8, xi],
+            y=by + by + [yi, yi, yi + 0.8, yi + 0.8],
+            z=[0, 0, 0, 0] + bz + [0, 0, dz, dz],
+            color=cscale[idx],
+            opacity=0.85,
+            showlegend=False,
+            hovertext=f"[{yi},{xi}] = {dz:.2f}",
+            hoverinfo='text',
+            flatshading=True
+        ))
 
     fig.update_layout(
         title=title,
