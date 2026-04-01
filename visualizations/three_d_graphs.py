@@ -425,8 +425,13 @@ def show_3d_graphs_ui():
                     return gaussian(x, y, sigma)
 
             else:  # Custom
-                st.text_area("Custom function (use x, y):", "np.sin(x) * np.cos(y)")
-                # In a real implementation, you would parse and evaluate this safely
+                custom_expr = st.text_area("Custom function (use x, y):", "np.sin(x) * np.cos(y)")
+
+                def custom_func(x, y, expr=custom_expr):
+                    try:
+                        return eval(expr, {"np": np, "x": x, "y": y, "__builtins__": {}})
+                    except Exception:
+                        return np.sin(x) * np.cos(y)
 
             resolution = st.slider("Resolution", 20, 100, 50, 5)
             x_range = st.slider("X range", -10.0, 10.0, (-5.0, 5.0), 0.5)
@@ -510,6 +515,16 @@ def show_3d_graphs_ui():
             elif matrix_type == "Symmetric":
                 matrix = np.random.randn(size, size)
                 matrix = (matrix + matrix.T) / 2
+            elif matrix_type == "Custom":
+                matrix = np.zeros((size, size))
+                for i in range(size):
+                    cols = st.columns(size)
+                    for j in range(size):
+                        with cols[j]:
+                            matrix[i, j] = st.number_input(
+                                f"({i+1},{j+1})", value=0.0,
+                                key=f"matrix_{i}_{j}", label_visibility="collapsed"
+                            )
 
             fig = create_matrix_visualization(
                 matrix,
